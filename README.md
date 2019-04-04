@@ -2,9 +2,9 @@
 
 Created during the Week 4 of the course: "Convolutional Neural Networks" (Coursera)
 
-* nst_utils.py: Provided in the course, only a litle bit of modifications were done. 
+* __nst_utils.py__: Provided in the course, only a litle bit of modifications were done (to resize any image to the input the model expects -> 300x400). 
 
-* NST_Network_class.py: Full class of the network, it allows the user to load a pretrained model and change the hyperparameters easily.
+* __NST_Network_class.py__: Full class of the network, it allows the user to load a pretrained model and change the hyperparameters easily.
 
 The model used is the VGG-19,  you can find it in __[Kaggle](https://www.kaggle.com/teksab/imagenetvggverydeep19mat/version/1)__ or in __[MatConvNet](http://www.vlfeat.org/matconvnet/pretrained/)__
 
@@ -34,8 +34,6 @@ The network was done using CPU (my GPU is worse)
 
 The parameters/hyperparameters are fully customizable for tunnint purposes. 
 
-*__Learning rate__ : 2.0
-
-*__Iterations__ : 200
-
-*__Activation layer to evaluate generated image__: conv4_1
+* __Learning rate__ : 2.0
+* __Iterations__ : 200
+* __Activation layer to evaluate generated image__: conv4_1
