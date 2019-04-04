@@ -35,5 +35,7 @@ The network was done using CPU (my GPU is worse)
 The parameters/hyperparameters are fully customizable for tunnint purposes. 
 
 *__Learning rate__ : 2.0
+
 *__Iterations__ : 200
-*__Activation layer to evaluate__: conv4_1
+
+*__Activation layer to evaluate generated image__: conv4_1
