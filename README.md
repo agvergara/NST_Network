@@ -12,6 +12,9 @@ Why Neural Style Transfer? I think this is a fun application of convolutional ne
 
 Example of use:
 ```python
+from NST_Network_class import NST_Network
+from .nst_utils import load_vgg_model, generate_noise_image, reshape_and_normalize_image, save_image
+
 content_img = "[HERE YOUR PATH]" + content_img_name
 style_img = "[HERE YOUR PATH]" + content_img_name
 model_path = "[PATH TO MODEL]"
