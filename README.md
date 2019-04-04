@@ -32,7 +32,7 @@ The network was done using CPU (my GPU is worse)
 
 ## Network hyperparameters:
 
-The parameters/hyperparameters are fully customizable for tunnint purposes. 
+The parameters/hyperparameters are fully customizable for tunning purposes. 
 
 * __Learning rate__ : 2.0
 * __Iterations__ : 200
