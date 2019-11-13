@@ -6,14 +6,16 @@ Created on Wed Mar 20 10:18:59 2019
 """
 
 
-import scipy.io
-import scipy.misc
-from .nst_utils import load_vgg_model, generate_noise_image, reshape_and_normalize_image, save_image
-import tensorflow as tf
+from matplotlib.pyplot import imread
+from nst_utils import load_vgg_model, generate_noise_image, reshape_and_normalize_image, save_image
+import tensorflow.compat.v1 as tf
 
-class NST_Network():
-    
-    def __init__(self, learning_rate=2.0, num_iterations=200):
+tf.disable_v2_behavior()
+
+
+class NSTNetwork:
+
+    def __init__(self, output_dir, learning_rate=2.0, num_iterations=200):
         self.style_layers = [
             ('conv1_1', 0.2),
             ('conv2_1', 0.2),
@@ -23,115 +25,110 @@ class NST_Network():
         self.model = None
         self.learning_rate = learning_rate
         self.num_iterations = num_iterations
-        self.output_dir = "output/"
+        self.output_dir = output_dir
         
     @staticmethod   
-    def load_normalize_content_img (content_img_path):
+    def load_normalize_content_img(content_img_path):
         
-        content_img = scipy.misc.imread(content_img_path)
+        content_img = imread(content_img_path)
         content_img = reshape_and_normalize_image(content_img)
         return content_img
         
     @staticmethod   
-    def load_normalize_style_img (style_img_path):
+    def load_normalize_style_img(style_img_path):
         
-        style_img = scipy.misc.imread(style_img_path)
+        style_img = imread(style_img_path)
         style_img = reshape_and_normalize_image(style_img)
         return style_img
         
     @staticmethod   
-    def generate_noisy_img (content_img):
+    def generate_noisy_img(content_img):
         
         generated_noisy_img = generate_noise_image(content_img)
         return generated_noisy_img
-        
-    
-    def load_model (self, model_path):
+
+    def load_model(self, model_path):
         
         self.model = load_vgg_model(model_path)
+
+    def choose_optimizer(self, optimizer_select="Adam"):
         
-        
-    def choose_optimizer (self, optimizer_select="Adam"):
-        
-        optimizer = None
-        if (optimizer_select == "Adam"):
+        if optimizer_select == "Adam":
             optimizer = tf.train.AdamOptimizer(self.learning_rate)
         else:
             optimizer = "Optimizer not recognised"
         return optimizer
-    
-    
+
     # Functions to compute Style/Content cost, Total cost and the network.
     @staticmethod   
-    def compute_content_cost(aC, aG):
+    def compute_content_cost(a_c, a_g):
         
-        m, nH, nW, nC = aG.get_shape().as_list() 
-        aC = tf.transpose(tf.reshape(aC, [nH * nW, nC]))
-        aG = tf.transpose(tf.reshape(aG, [nH * nW, nC]))
-        J_content = (1/(4 * nH * nW * nC)) * tf.reduce_sum(tf.square(tf.subtract(aC, aG)))
-        return J_content
+        m, nh, nw, nc = a_g.get_shape().as_list()
+        a_c = tf.transpose(tf.reshape(a_c, [nh * nw, nc]))
+        a_g = tf.transpose(tf.reshape(a_g, [nh * nw, nc]))
+        j_content = (1/(4 * nh * nw * nc)) * tf.reduce_sum(tf.square(tf.subtract(a_c, a_g)))
+        return j_content
     
     @staticmethod   
-    def gram_matrix(A):
+    def gram_matrix(matrix):
         
-        GA = tf.matmul(A,tf.transpose(A))
-        return GA
+        ga = tf.matmul(matrix, tf.transpose(matrix))
+        return ga
     
-    def compute_layer_style_cost(self, aS, aG):
+    def compute_layer_style_cost(self, a_s, a_g):
         
-        m, nH, nW, nC = aG.get_shape().as_list()
-        aS = tf.transpose(tf.reshape(aS, [nH * nW, nC]))
-        aG = tf.transpose(tf.reshape(aG, [nH * nW, nC]))
-        GS = self.gram_matrix(aS)
-        GG = self.gram_matrix(aG)     
-        normalize_term = 1 / (4 * nC**2 * (nH * nW)**2)
-        J_style_layer = normalize_term * (tf.reduce_sum(tf.square(tf.subtract(GS, GG))))
-        return J_style_layer
-    
-    
+        m, nh, nw, nc = a_g.get_shape().as_list()
+        a_s = tf.transpose(tf.reshape(a_s, [nh * nw, nc]))
+        a_g = tf.transpose(tf.reshape(a_g, [nh * nw, nc]))
+        gs = self.gram_matrix(a_s)
+        gg = self.gram_matrix(a_g)
+        normalize_term = 1 / (4 * nc**2 * (nh * nw)**2)
+        j_style_layer = normalize_term * (tf.reduce_sum(tf.square(tf.subtract(gs, gg))))
+        return j_style_layer
+
     def compute_style_cost(self, model, style_layers, sess):
         
-        J_style = 0
+        j_style = 0
         for layer_name, coeff in style_layers:
             out = model[layer_name]
-            aS = sess.run(out)
-            aG = out
-            J_style_layer = self.compute_layer_style_cost(aS, aG)
-            J_style += coeff * J_style_layer
-        return J_style
+            a_s = sess.run(out)
+            a_g = out
+            j_style_layer = self.compute_layer_style_cost(a_s, a_g)
+            j_style += coeff * j_style_layer
+        return j_style
     
     @staticmethod   
-    def total_cost(J_content, J_style, alpha=10, beta=40): 
+    def total_cost(j_content, j_style, alpha=10, beta=40):
         
-        J = alpha * J_content + beta * J_style
-        return J 
+        j = alpha * j_content + beta * j_style
+        return j
     
     def model_nst(self, input_image, optimizer, content_img, style_img, output_name, graph, sess, print_output=False):
         
         sess.run(self.model['input'].assign(content_img))
         out = self.model['conv4_2']
-        aC = sess.run(out)
-        aG = out
-        J_content = self.compute_content_cost(aC, aG)
+        a_c = sess.run(out)
+        a_g = out
+        j_content = self.compute_content_cost(a_c, a_g)
           
         sess.run(self.model['input'].assign(style_img))
-        J_style = self.compute_style_cost(self.model, self.style_layers, sess)
+        j_style = self.compute_style_cost(self.model, self.style_layers, sess)
          
-        J = self.total_cost(J_content, J_style)
+        j = self.total_cost(j_content, j_style)
           
-        train_step = optimizer.minimize(J)
+        train_step = optimizer.minimize(j)
         sess.run(tf.global_variables_initializer())
         sess.run(self.model['input'].assign(input_image))
             
         for i in range(self.num_iterations):
             sess.run(train_step)
             generated_image = sess.run(self.model['input'])
-            if ((i%20 == 0) and (print_output)):
-                Jt, Jc, Js = sess.run([J, J_content, J_style])
+            if i % 20 == 0 and print_output:
+                jt, jc, js = sess.run([j, j_content, j_style])
                 print("Iteration " + str(i) + " :")
-                print("Total cost = " + str(Jt))
-                print("Content cost = " + str(Jc))
-                print("Style cost = " + str(Js))  
+                print("Total cost = " + str(jt))
+                print("Content cost = " + str(jc))
+                print("Style cost = " + str(js))
                 save_image(self.output_dir + output_name + '_' + str(i) + ".png", generated_image)   
         sess.close()
         path_generated_img = self.output_dir + output_name + '.png'

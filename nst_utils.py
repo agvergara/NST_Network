@@ -1,13 +1,18 @@
-from scipy import io, misc
+from scipy import io
+from PIL import Image
+import cv2
 import numpy as np
-import tensorflow as tf
+import tensorflow.compat.v1 as tf
+from matplotlib.pyplot import imsave
+
+tf.disable_v2_behavior()
 
 class CONFIG:
-    IMAGE_WIDTH = 400
-    IMAGE_HEIGHT = 300
+    IMAGE_WIDTH = 600
+    IMAGE_HEIGHT = 600
     COLOR_CHANNELS = 3
     NOISE_RATIO = 0.6
-    MEANS = np.array([123.68, 116.779, 103.939]).reshape((1,1,1,3)) 
+    MEANS = np.array([123.68, 116.779, 103.939]).reshape((1, 1, 1, 3))
 
     
 def load_vgg_model(path):
@@ -77,8 +82,6 @@ def load_vgg_model(path):
         assert layer_name == expected_layer_name
         return W, b
 
-        return W, b
-
     def _relu(conv2d_layer):
         """
         Return the RELU function wrapped over a TensorFlow layer. Expects a
@@ -111,32 +114,33 @@ def load_vgg_model(path):
 
     # Constructs the graph model.
     graph = {}
-    graph['input']   = tf.Variable(np.zeros((1, CONFIG.IMAGE_HEIGHT, CONFIG.IMAGE_WIDTH, CONFIG.COLOR_CHANNELS)), dtype = 'float32')
-    graph['conv1_1']  = _conv2d_relu(graph['input'], 0, 'conv1_1')
-    graph['conv1_2']  = _conv2d_relu(graph['conv1_1'], 2, 'conv1_2')
+    graph['input'] = tf.Variable(np.zeros((1, CONFIG.IMAGE_HEIGHT, CONFIG.IMAGE_WIDTH, CONFIG.COLOR_CHANNELS)), dtype='float32')
+    graph['conv1_1'] = _conv2d_relu(graph['input'], 0, 'conv1_1')
+    graph['conv1_2'] = _conv2d_relu(graph['conv1_1'], 2, 'conv1_2')
     graph['avgpool1'] = _avgpool(graph['conv1_2'])
-    graph['conv2_1']  = _conv2d_relu(graph['avgpool1'], 5, 'conv2_1')
-    graph['conv2_2']  = _conv2d_relu(graph['conv2_1'], 7, 'conv2_2')
+    graph['conv2_1'] = _conv2d_relu(graph['avgpool1'], 5, 'conv2_1')
+    graph['conv2_2'] = _conv2d_relu(graph['conv2_1'], 7, 'conv2_2')
     graph['avgpool2'] = _avgpool(graph['conv2_2'])
-    graph['conv3_1']  = _conv2d_relu(graph['avgpool2'], 10, 'conv3_1')
-    graph['conv3_2']  = _conv2d_relu(graph['conv3_1'], 12, 'conv3_2')
-    graph['conv3_3']  = _conv2d_relu(graph['conv3_2'], 14, 'conv3_3')
-    graph['conv3_4']  = _conv2d_relu(graph['conv3_3'], 16, 'conv3_4')
+    graph['conv3_1'] = _conv2d_relu(graph['avgpool2'], 10, 'conv3_1')
+    graph['conv3_2'] = _conv2d_relu(graph['conv3_1'], 12, 'conv3_2')
+    graph['conv3_3'] = _conv2d_relu(graph['conv3_2'], 14, 'conv3_3')
+    graph['conv3_4'] = _conv2d_relu(graph['conv3_3'], 16, 'conv3_4')
     graph['avgpool3'] = _avgpool(graph['conv3_4'])
-    graph['conv4_1']  = _conv2d_relu(graph['avgpool3'], 19, 'conv4_1')
-    graph['conv4_2']  = _conv2d_relu(graph['conv4_1'], 21, 'conv4_2')
-    graph['conv4_3']  = _conv2d_relu(graph['conv4_2'], 23, 'conv4_3')
-    graph['conv4_4']  = _conv2d_relu(graph['conv4_3'], 25, 'conv4_4')
+    graph['conv4_1'] = _conv2d_relu(graph['avgpool3'], 19, 'conv4_1')
+    graph['conv4_2'] = _conv2d_relu(graph['conv4_1'], 21, 'conv4_2')
+    graph['conv4_3'] = _conv2d_relu(graph['conv4_2'], 23, 'conv4_3')
+    graph['conv4_4'] = _conv2d_relu(graph['conv4_3'], 25, 'conv4_4')
     graph['avgpool4'] = _avgpool(graph['conv4_4'])
-    graph['conv5_1']  = _conv2d_relu(graph['avgpool4'], 28, 'conv5_1')
-    graph['conv5_2']  = _conv2d_relu(graph['conv5_1'], 30, 'conv5_2')
-    graph['conv5_3']  = _conv2d_relu(graph['conv5_2'], 32, 'conv5_3')
-    graph['conv5_4']  = _conv2d_relu(graph['conv5_3'], 34, 'conv5_4')
+    graph['conv5_1'] = _conv2d_relu(graph['avgpool4'], 28, 'conv5_1')
+    graph['conv5_2'] = _conv2d_relu(graph['conv5_1'], 30, 'conv5_2')
+    graph['conv5_3'] = _conv2d_relu(graph['conv5_2'], 32, 'conv5_3')
+    graph['conv5_4'] = _conv2d_relu(graph['conv5_3'], 34, 'conv5_4')
     graph['avgpool5'] = _avgpool(graph['conv5_4'])
     
     return graph
 
-def generate_noise_image(content_image, noise_ratio = CONFIG.NOISE_RATIO):
+
+def generate_noise_image(content_image, noise_ratio=CONFIG.NOISE_RATIO):
 
     noise_image = np.random.uniform(-20, 20, (1, CONFIG.IMAGE_HEIGHT, CONFIG.IMAGE_WIDTH, CONFIG.COLOR_CHANNELS)).astype('float32')
     input_image = noise_image * noise_ratio + content_image * (1 - noise_ratio)
@@ -146,12 +150,15 @@ def generate_noise_image(content_image, noise_ratio = CONFIG.NOISE_RATIO):
 
 def reshape_and_normalize_image(image):
     
-    image = misc.imresize(image, (300,400))
+    image = np.array(Image.fromarray(image).resize((CONFIG.IMAGE_HEIGHT, CONFIG.IMAGE_WIDTH)))
+    # Convert from 4 channels to 3
+    if len(image.shape) > 2 and image.shape[2] == 4:
+        image = cv2.cvtColor(image, cv2.COLOR_BGRA2RGB)
     # Reshape image to mach expected input of VGG19
     image = np.reshape(image, ((1,) + image.shape))
     
-    # Substract the mean to match the expected input of VGG19
-    image = image - CONFIG.MEANS
+    # Subtract the mean to match the expected input of VGG19
+    image = np.subtract(image, CONFIG.MEANS)
     
     return image
 
@@ -160,4 +167,4 @@ def save_image(path, image):
     
     image = image + CONFIG.MEANS
     image = np.clip(image[0], 0, 255).astype('uint8')
-    misc.imsave(path, image)
+    imsave(path, image)
